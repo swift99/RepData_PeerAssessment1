@@ -1,0 +1,112 @@
+# Reproducible Research: Peer Assessment 1    
+=======================================================
+8/17/2014      
+Swift-AAM
+
+- - -
+### Loading and preprocessing the data
+```{r load_data, results='markup'}
+Data <- read.csv("E:\\activity.csv", header=T)
+
+```
+```{r show_summary, results="asis"}
+library(xtable)
+#Set the output options for numbers
+options(scipen = 9, digits = 3 )
+print(xtable(summary(Data)), type="html")
+```
+- - -
+### What is mean total number of steps taken per day?
+```{r steps_day, results='markup'}
+library(plyr)
+spd <- ddply(Data, .(date), summarize, steps = sum(steps))
+mean.spd <- mean(spd$steps, na.rm = TRUE)
+median.spd <- median(spd$steps, na.rm = TRUE)
+```
+The mean total number of steps per day is `r mean.spd` and the median is `r median.spd`.
+- - -
+**Histogram of the total number of steps taken each day**
+```{r hist_steps_day, results='markup'}
+hist(spd$steps, xlab="Total number of steps per day", main=NULL, col="blue")
+abline(v=mean.spd, col = c("gray"))
+abline(v=median.spd, col = c("black"), lty = 2)
+```
+- - -
+### What is the average daily activity pattern?
+```{r steps_interval, results='markup'}
+spi <- ddply(Data, .(interval), summarize, steps = mean(steps, na.rm=TRUE))
+max.spi <- max(spi$steps)
+max.int <- spi[spi$steps==max(max.spi),1]
+```
+**Plot of the average number of steps taken each interval**
+```{r plot_steps_int, results='markup'}
+plot(spi$interval,spi$steps, ylab="Average number of steps per interval",xlab="Interval", main=NULL, type="l", lwd=2, col="green")
+abline(h=max.spi, col = c("red"))
+abline(v=max.int, col = c("black"))
+```
+The maximum number of steps per interval in average is `r max.spi` and corresponds to the interval `r max.int`.
+- - -
+### Imputing missing values
+```{r calc_na, results='markup'}
+miss <- dim(Data[is.na(Data$steps),])[1]
+```
+There are `r miss` rows with missing values.
+```{r filling_na, result='markup'}
+#Copy of Data
+Data1 <- Data
+#Filling na values with total steps means (Not good enough)
+# replace(Data1$steps, is.na(Data1$steps), mean(Data1$steps, na.rm=T))
+#Filling na values with interval's steps means (Much better)
+row.names(spi)<- spi$interval
+ind <- which(is.na(Data1$steps))
+Data1[ind,1] <- spi[as.factor(Data1[ind,3]),2]
+detach(Data)
+attach(Data1)
+```
+- - -
+### What is the new mean total number of steps taken per day?
+```{r steps_day1, results='markup'}
+spd1 <- ddply(Data1, .(date), summarize, steps = sum(steps))
+mean.spd1 <- mean(spd1$steps, na.rm = TRUE)
+median.spd1 <- median(spd1$steps, na.rm = TRUE)
+```
+The *new* mean total number of steps per day is `r mean.spd1` and the *new* median is `r median.spd1`.
+```{r miss_days, results='markup'}
+mdays <- dim(spd[is.na(spd$steps),])[1]
+mdays1 <- dim(spd1[is.na(spd1$steps),])[1]
+```
+*Do these values differ from the estimates from the first part of the assignment?*
+The mean of the first part is `r mean.spd` as well as the mean of the second part (`r mean.spd1`). The median of the fist part is `r median.spd` is different from the median of the second part: `r median.spd1`.
+*What is the impact of imputing missing data on the estimates of the total daily number of steps?*
+The first total daily number of steps estimation had `r mdays` missing values, while the second one has `r mdays1` missing values.
+```{r table_comp, results='asis'}
+t1 <- merge(spd,spd1, by=1)
+names(t1)<- c("Date","First estimate","Second estimate")
+print(xtable(t1), type="html")
+```
+- - -
+**Histogram of the new total number of steps taken each day**
+```{r hist_steps_day1, results='markup'}
+hist(spd1$steps, xlab="Total number of steps per day", main=NULL, col="light blue")
+abline(v=mean.spd1, col = c("red"))
+abline(v=median.spd1, col = c("blue"), lty = 2)
+```
+- - -
+### Are there differences in activity patterns between weekdays and weekends?
+```{r create_weekday, results='markup'}
+Data1$day <- weekdays(as.Date(date))
+attach(Data1)
+d <- levels(factor(day))
+Data1$week <- "weekday"
+Data1[day==d[1],5]<-"weekend"
+Data1[day==d[6],5]<-"weekend"
+Data1$week <- as.factor(Data1$week)
+spiw <- ddply(Data1, .(interval,week), summarize, steps = mean(steps, na.rm=TRUE))
+max.spiw <- max(spiw$steps)
+max.intw <- spiw[spiw$steps==max(max.spiw),1]
+```
+**Plot of the average number of steps taken each interval during weekends and weekdays**
+```{r plot_steps_week_int, results='markup'}
+library(ggplot2)
+ggplot(data=spiw, aes(x=interval, y=steps, group=week)) + geom_line(aes(color=week))+ facet_wrap(~ week, nrow=2)
+```
